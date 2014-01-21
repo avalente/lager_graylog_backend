@@ -207,6 +207,9 @@ functional_test() ->
 
     lager:start(),
 
+    % wait for a bit to allow lager to be fully started
+    timer:sleep(500),
+
     Self = self(),
     F = fun() -> udp_server(Self) end,
 

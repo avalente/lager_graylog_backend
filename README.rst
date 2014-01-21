@@ -7,7 +7,9 @@ Overview
 `Lager <https://github.com/basho/lager>`_ backend for `Graylog <http://graylog2.org>`_.
 This backend routes log messages to the `graylog` log server.
 
-.. image:: https://travis-ci.org/avalente/lager_graylog_backend.png?branch=master   :target: https://travis-ci.org/avalente/lager_graylog_backend
+.. image:: https://travis-ci.org/avalente/lager_graylog_backend.png?branch=master 
+    :target: https://travis-ci.org/avalente/lager_graylog_backend
+    :alt: Build status
 
 Usage
 -----
