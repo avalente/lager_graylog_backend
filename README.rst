@@ -29,6 +29,11 @@ Then you need to add a new "handler" in lager configuration, usually in your `ap
             ]}
         ]}
 
+Lager
+-----
+
+`lager_graylog_backend` works with Lager version 2.0 or above.
+
 Test
 ----
 
