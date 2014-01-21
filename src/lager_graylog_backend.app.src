@@ -1,0 +1,12 @@
+{application, lager_graylog_backend,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { lager_graylog_backend_app, []}},
+  {env, []}
+ ]}.
