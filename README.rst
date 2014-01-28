@@ -23,15 +23,36 @@ Then you need to add a new "handler" in lager configuration, usually in your `ap
     {lager, [
         {handlers, [
             {lager_graylog_backend, [
-                {host, "<graylog_host>:<graylog_port>"},
+                {host, "localhost:12201"},
                     {level, info}, 
                     {name, graylog2},
                     {format_config, [
-                        {facility, "<facility>"}
+                        {facility, "myapp"},
+                        {extra_fields, [
+                            {'_environment', <<"production">>}
                         ]}
+                    ]}
                 ]}
             ]}
         ]}
+
+Configuration
+-------------
+
+Backend configuration parameters:
+
+ * host: graylog server with explicit port number (usually 12201) (string, required)
+ * level: minimum logging level - messages below that level will be dropped (atom, required)
+ * name: backend name (atom, required)
+ * format_config: backend-specific configuration - a proplist with:
+
+     * facility: logging facility (string, defaults to "erlang")
+     * short_message_size: maximum length for the "short message" field (integer, defaults to 80)
+     * compression: one of disabled, gzip, zlib (atom, defaults to gzip)
+     * host: source hostname, defaults to the local host's name (string)
+     * extra_fields: optional proplist of {name, value}, they will be sent as "additional fields" to graylog. The name must be an atom starting with an underscore, while the value must be a binary.
+
+
 
 Lager
 -----

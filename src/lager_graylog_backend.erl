@@ -21,7 +21,7 @@
 -export([init/1, handle_call/2, handle_event/2, handle_info/2, terminate/2,
          code_change/3]).
 
--record(state, {name, address, port, socket, level, formatter=lager_gelf_formatter, format_config, extra_fields}).
+-record(state, {name, address, port, socket, level, formatter=lager_gelf_formatter, format_config}).
 
 -include_lib("lager/include/lager.hrl").
 
@@ -41,7 +41,7 @@
 %
 
 init(Config)->
-    {Level, FormatConfig, InetFamily, {Host, Port}, ExtraFields, Name} = get_config(Config),
+    {Level, FormatConfig, InetFamily, {Host, Port}, Name} = get_config(Config),
 
     {ok,Address} = inet:getaddr(Host, InetFamily),
 
@@ -54,8 +54,7 @@ init(Config)->
         address=Address,
         port=Port,
         socket=Socket,
-        format_config=FormatConfig,
-        extra_fields=ExtraFields}
+        format_config=FormatConfig}
     }.
 
 
@@ -110,14 +109,13 @@ get_config(Config) ->
     FormatConfig = proplists:get_value(format_config, Config, []),
     InetFamily = proplists:get_value(inet_family, Config, inet),
     {Host, Port} = get_host(proplists:get_value(host, Config, undefined)),
-    ExtraFields = proplists:get_value(extra_fields, Config, []),
     
     Name = proplists:get_value(name, Config, {Host, Port}),  
     
     check_config({level, Level}),
     check_config({inet_family, InetFamily}),
 
-    {Level, FormatConfig, InetFamily, {Host, Port}, ExtraFields, Name}.
+    {Level, FormatConfig, InetFamily, {Host, Port}, Name}.
 
 
 check_config({inet_family,F}) when F =/= inet6 andalso F=/= inet ->
@@ -162,7 +160,21 @@ get_host(FullHost) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
--define(PORT, 12201).
+udp_server(Caller) ->
+    % open a socket on the port zero, this asks the kernel to use a free port
+    {ok, Socket} = gen_udp:open(0, [binary, {active, once}]),
+
+    {ok, Port} = inet:port(Socket),
+
+    % send the port to the caller
+    Caller ! {port, Port},
+
+    % wait for log
+    receive
+        {udp, Socket, _Host, _Port, Bin} ->
+            Caller ! {data, Bin}
+    end,
+    gen_udp:close(Socket).
 
 init_test() ->
     Config = [{host, "localhost:12201"}],
@@ -170,7 +182,7 @@ init_test() ->
 
     ?assertMatch({ok, #state{level=64, name={?MODULE, {"localhost", 12201}},
                            address={127,0,0,1}, port=12201,
-                           socket=_, format_config=[], extra_fields=[]}}, Res).
+                           socket=_, format_config=[]}}, Res).
 
 handle_call_set_loglevel_test_() ->
     [
@@ -184,22 +196,33 @@ handle_call_get_loglevel_test() ->
 handle_call_cathcall_test() ->
     ?assertEqual({ok, ok, #state{}}, handle_call(test, #state{})).
 
-udp_server(Caller) ->
-    {ok, Socket} = gen_udp:open(?PORT, [binary, {active, once}]),
-    receive
-        {udp, Socket, _Host, _Port, Bin} ->
-            Caller ! {data, Bin}
-    end,
-    gen_udp:close(Socket).
 
 functional_test() ->
+    % start the fake server
+    Self = self(),
+    F = fun() -> udp_server(Self) end,
+
+    spawn_link(F),
+
+    % wait for the server's port
+    Port = receive
+        {port, P} ->
+            P
+    after 500 ->
+        {error, not_started}
+    end,
+
     Cfg = [{lager_graylog_backend, [
-                    {host, "localhost:"++integer_to_list(?PORT)},
-                    {level, info}, 
+                    {host, "localhost:"++integer_to_list(Port)},
+                    {level, error},
                     {name, graylog2},
                     {format_config, [
-                            {facility, "lager-test"}
-                            ]}
+                        {facility, "lager-test"},
+                        {short_message_size, 4},
+                        {extra_fields, [
+                            {'_environment', <<"test">>}
+                        ]}
+                    ]}
                     ]}],
 
     application:load(lager),
@@ -207,15 +230,9 @@ functional_test() ->
 
     lager:start(),
 
-    % wait for a bit to allow lager to be fully started
-    timer:sleep(500),
-
-    Self = self(),
-    F = fun() -> udp_server(Self) end,
-
-    spawn_link(F),
-
-    lager:log(info, self(), "This is a test"),
+    % level is "error", so lower-level messages should be dropped
+    lager:log(warning, self(), "This should never be received"),
+    lager:log(error, self(), "This is a test"),
 
     {Res} = receive
         {data, Bin} ->
@@ -225,8 +242,9 @@ functional_test() ->
     end,
 
     ?assertEqual(<<"1.0">>, proplists:get_value(<<"version">>, Res)),
-    ?assertEqual(<<"This is a test">>, proplists:get_value(<<"short_message">>, Res)),
+    ?assertEqual(<<"This">>, proplists:get_value(<<"short_message">>, Res)),
     ?assertEqual(<<"This is a test">>, proplists:get_value(<<"full_message">>, Res)),
-    ?assertEqual(6, proplists:get_value(<<"level">>, Res)).
+    ?assertEqual(<<"test">>, proplists:get_value(<<"_environment">>, Res)),
+    ?assertEqual(3, proplists:get_value(<<"level">>, Res)).
 
 -endif.

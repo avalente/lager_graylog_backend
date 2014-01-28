@@ -23,7 +23,7 @@ format(Message, Config, _Colors) ->
     format(Message, Config).
 
 format(Message, Config) ->
-    Data = get_raw_data(Message, Config),
+    Data = get_raw_data(Message, Config) ++ getvalue(extra_fields, Config, []),
     Json = jiffy:encode({Data}),
     compressed(Json, getvalue(compression, Config, gzip)).
 
@@ -265,5 +265,38 @@ format_3_test() ->
 
     ?assertEqual(Expected, Data).
 
+format_2_with_extra_fields_test() ->
+    Now = os:timestamp(),
+    MD = [{application, lager_graylog_backend}],
+    Cfg = [{short_message_size, 6},
+           {host, "localhost"},
+           {inet_family, inet},
+           {facility, "lager-test"},
+           {extra_fields, [
+               {'_environment', <<"test">>}
+           ]},
+           {compression, disabled}],
+
+    Message = lager_msg:new("a long message", Now, info, MD, []),
+    Data = format(Message, Cfg),
+
+    Expected = jiffy:encode({[{version, <<"1.0">>},
+                              {level, 6},
+                              {short_message, <<"a long">>},
+                              {full_message, <<"a long message">>},
+                              {timestamp, unix_timestamp(Now)},
+                              {line, -1},
+                              {file, <<"undefined">>},
+                              {host, <<"localhost">>},
+                              {facility, <<"lager-test">>},
+                              {'_from_pid', <<"unknown">>},
+                              {'_node', <<"undefined">>},
+                              {'_application', <<"lager_graylog_backend">>},
+                              {'_module', <<"undefined">>},
+                              {'_function', <<"undefined">>},
+                              {'_environment', <<"test">>}
+                             ]}),
+
+    ?assertEqual(Expected, Data).
 
 -endif.
