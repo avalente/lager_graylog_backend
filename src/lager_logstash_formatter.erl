@@ -24,7 +24,8 @@ format(Message, Config, _Colors) ->
 
 format(Message, Config) ->
     Data = get_raw_data(Message, Config) ++ getvalue(extra_fields, Config, []),
-    jiffy:encode({Data}).
+    Msg = jiffy:encode({Data}),
+    <<Msg/binary,"\n">>.
 
 utc_iso_datetime(Message) ->
     Ts = {_, _, Micro} = lager_msg:timestamp(Message),
@@ -201,7 +202,7 @@ format_2_test() ->
                                   {'function', <<"undefined">>}]}}
                              ]}),
 
-    ?assertEqual(Expected, Data).
+    ?assertEqual(<<Expected/binary,"\n">>, Data).
 
 format_3_test() ->
     Now = os:timestamp(),
@@ -227,7 +228,7 @@ format_3_test() ->
                                   {'function', <<"undefined">>}]}}
                              ]}),
 
-    ?assertEqual(Expected, Data).
+    ?assertEqual(<<Expected/binary,"\n">>, Data).
 
 format_2_with_extra_fields_test() ->
     Now = os:timestamp(),
@@ -259,6 +260,6 @@ format_2_with_extra_fields_test() ->
                               {'extra', <<"test">>}
                              ]}),
 
-    ?assertEqual(Expected, Data).
+    ?assertEqual(<<Expected/binary,"\n">>, Data).
 
 -endif.
